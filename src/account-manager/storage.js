@@ -21,10 +21,20 @@ let writeLock = null;
  */
 export async function loadAccounts(configPath = ACCOUNT_CONFIG_PATH) {
     try {
-        // Check if config file exists using async access
-        await access(configPath, fsConstants.F_OK);
-        const configData = await readFile(configPath, 'utf-8');
-        const config = JSON.parse(configData);
+        let config;
+        // Check the environment variable first!
+        if (process.env.ACCOUNTS_JSON) {
+            logger.info("Loading accounts from environment variable...");
+            config = JSON.parse(process.env.ACCOUNTS_JSON);
+            if (Array.isArray(config)) {
+                config = { accounts: config };
+            }
+        } else {
+            // Check if config file exists using async access
+            await access(configPath, fsConstants.F_OK);
+            const configData = await readFile(configPath, 'utf-8');
+            config = JSON.parse(configData);
+        }
 
         const accounts = (config.accounts || []).map(acc => ({
             ...acc,
