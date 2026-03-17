@@ -24,28 +24,19 @@ const modelCache = {
 };
 
 /**
- * Check if a model is "Work-Grade" supported (Claude 4.6+ or Gemini 3+)
- * Filters out older versions (2.5), experimental agents, and raw internal IDs.
+ * Check if a model is supported (Claude or Gemini)
  * @param {string} modelId - Model ID to check
- * @returns {boolean} True if model is production-ready for coding work
+ * @returns {boolean} True if model is supported
  */
 function isSupportedModel(modelId) {
     const family = getModelFamily(modelId);
     if (family === 'unknown') return false;
 
-    const lower = modelId.toLowerCase();
+    // Filter out long "raw" model paths (those starting with models/)
+    // to keep the /model list clean and prevent CLI display issues.
+    if (modelId.startsWith('models/')) return false;
 
-    // 1. Block messy internal Google IDs
-    if (lower.startsWith('models/')) return false;
-
-    // 2. Strictly allow only "Work-Grade" models:
-    // - Claude 4.6 series (Sonnet/Opus)
-    // - Gemini 3.0 or higher (Pro/Flash)
-    const isClaudeWorkGrade = lower.includes('claude') && lower.includes('4-6');
-    const isGeminiWorkGrade = lower.includes('gemini') && 
-                               (lower.includes('gemini-3') || lower.includes('gemini-4'));
-
-    return isClaudeWorkGrade || isGeminiWorkGrade;
+    return true;
 }
 
 /**
