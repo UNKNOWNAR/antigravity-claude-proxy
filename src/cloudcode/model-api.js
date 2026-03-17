@@ -26,11 +26,18 @@ const modelCache = {
 /**
  * Check if a model is supported (Claude or Gemini)
  * @param {string} modelId - Model ID to check
+ * @param {boolean} [listingOnly=false] - Whether this check is for /v1/models listing
  * @returns {boolean} True if model is supported
  */
-function isSupportedModel(modelId) {
+function isSupportedModel(modelId, listingOnly = false) {
     const family = getModelFamily(modelId);
-    return family === 'claude' || family === 'gemini';
+    if (family === 'unknown') return false;
+
+    // For /v1/models listing, filter out raw Google internal IDs (starting with models/)
+    // to keep the /model command list clean and professional in the CLI.
+    if (listingOnly && modelId.startsWith('models/')) return false;
+
+    return true;
 }
 
 /**
@@ -47,7 +54,7 @@ export async function listModels(token) {
     }
 
     const modelList = Object.entries(data.models)
-        .filter(([modelId]) => isSupportedModel(modelId))
+        .filter(([modelId]) => isSupportedModel(modelId, true)) // Pass flag to hide raw IDs
         .map(([modelId, modelData]) => ({
             id: modelId,
             object: 'model',
