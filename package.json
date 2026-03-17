@@ -6,7 +6,10 @@
   "type": "module",
   "bin": {
     "antigravity-claude-proxy": "bin/cli.js",
-    "acc": "bin/cli.js"
+    "acc": "bin/cli.js",
+    "ai": "bin/cli.js",
+    "ai-on": "bin/cli.js",
+    "ai-off": "bin/cli.js"
   },
   "files": [
     "src",

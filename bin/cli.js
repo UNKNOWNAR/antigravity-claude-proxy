@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import { dirname, join, basename } from 'path';
 import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync } from 'fs';
 import { spawn, exec } from 'child_process';
 
@@ -21,7 +21,14 @@ const CONFIG_DIR = join(process.env.HOME || process.env.USERPROFILE || '', '.con
 const PID_FILE = join(CONFIG_DIR, 'server.pid');
 
 const args = process.argv.slice(2);
-const command = args[0];
+let command = args[0];
+
+// Support running as standalone binaries (e.g. ai-on instead of ai ai-on)
+const binName = basename(process.argv[1]);
+if (!command) {
+  if (binName === 'ai-on') command = 'ai-on';
+  else if (binName === 'ai-off') command = 'ai-off';
+}
 
 // Ensure config directory exists
 function ensureConfigDir() {
@@ -303,15 +310,15 @@ async function showStatus() {
     console.log(`  └─ Dashboard: http://localhost:${port}/`);
     console.log('');
     console.log('  AVAILABLE COMMANDS');
-    console.log('  • acc ui         Open dashboard');
-    console.log('  • acc restart    Relaunch proxy');
-    console.log('  • acc stop       Take offline');
+    console.log('  • ai ui          Open dashboard');
+    console.log('  • ai restart     Relaunch proxy');
+    console.log('  • ai stop        Take offline');
   } else {
     console.log('  STATUS');
     console.log('  🌑 Proxy is offline');
     console.log('');
     console.log('  TO LAUNCH');
-    console.log('  • acc start      Bring proxy online');
+    console.log('  • ai start       Bring proxy online');
   }
   
   // Show Claude CLI connection status
@@ -389,7 +396,7 @@ with intelligent load balancing across Google accounts.
 
 USAGE
   antigravity-claude-proxy <command> [options]
-  acc <command> [options]                 ← shorthand
+  ai <command> [options]                  ← shorthand
 
 ━━━ PROXY CONTROL ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   start              Launch proxy as background service
@@ -398,8 +405,8 @@ USAGE
   status             View proxy health and details
   ui                 Open dashboard in browser
   models             List available Work-Grade models
-  on                 Set Claude CLI to use local proxy
-  off                Restore Claude CLI to official API
+  ai-on              Set Claude CLI to use local proxy
+  ai-off             Restore Claude CLI to official API
 
 ━━━ ACCOUNT MANAGEMENT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   accounts           Interactive account menu
@@ -498,7 +505,8 @@ async function main() {
       break;
     }
 
-    case 'on': {
+    case 'on':
+    case 'ai-on': {
       const port = getPort();
       console.log('');
       console.log(`🔌 Connecting Claude CLI to local proxy (localhost:${port})...`);
@@ -519,7 +527,8 @@ async function main() {
       break;
     }
 
-    case 'off': {
+    case 'off':
+    case 'ai-off': {
       console.log('');
       console.log('🔌 Restoring Claude CLI to official Anthropic API...');
       try {
