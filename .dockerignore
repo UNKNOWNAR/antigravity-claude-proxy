@@ -1,0 +1,16 @@
+node_modules
+.git
+.github
+tests
+docs
+images
+*.log
+*.tmp
+.DS_Store
+.env*
+.claude/
+CLAUDE.md
+package-lock.json
+public/css/src
+tailwind.config.js
+postcss.config.js
