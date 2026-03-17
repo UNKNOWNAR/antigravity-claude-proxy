@@ -378,6 +378,7 @@ USAGE
   restart            Relaunch the proxy
   status             View proxy health and details
   ui                 Open dashboard in browser
+  models             List available Work-Grade models
 
 ━━━ ACCOUNT MANAGEMENT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   accounts           Interactive account menu
@@ -455,6 +456,26 @@ async function main() {
     case 'ui':
       await openUI();
       break;
+
+    case 'models': {
+      await ensureConfigDir();
+      if (!isServiceRunning()) {
+        console.log('🌌 Proxy offline - launching temporarily to fetch models...');
+      }
+      const port = getPort();
+      try {
+        const response = await fetch(`http://localhost:${port}/v1/models`);
+        const data = await response.json();
+        console.log('');
+        console.log('💎 Work-Grade Models Available:');
+        console.log('─'.repeat(30));
+        data.data.forEach(m => console.log(` • ${m.id}`));
+        console.log('');
+      } catch (e) {
+        console.log('🌑 Could not reach proxy. Start it first with: acc start');
+      }
+      break;
+    }
 
     case 'accounts': {
       // Pass remaining args to accounts CLI
