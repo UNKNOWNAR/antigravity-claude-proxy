@@ -498,5 +498,30 @@ window.Components.accountManager = () => ({
             // Reset file input
             event.target.value = '';
         }
+    },
+
+    /**
+     * Copy accounts as ACCOUNTS_JSON string for App Runner
+     */
+    async copyAppRunnerJson() {
+        const store = Alpine.store('global');
+        try {
+            const { response, newPassword } = await window.utils.request(
+                '/api/accounts/env-json',
+                {},
+                store.webuiPassword
+            );
+            if (newPassword) store.webuiPassword = newPassword;
+
+            const data = await response.json();
+            if (data.status === 'ok' && data.json) {
+                await navigator.clipboard.writeText(data.json);
+                store.showToast(store.t('syncStringCopied') || 'Current config copied! Paste this into ACCOUNTS_JSON in App Runner Console.', 'success', 5000);
+            } else {
+                throw new Error(data.error || 'Failed to generate sync string');
+            }
+        } catch (e) {
+            store.showToast('Failed to copy sync string: ' + e.message, 'error');
+        }
     }
 });

@@ -446,7 +446,7 @@ export function mountWebUI(app, dirname, accountManager) {
     });
 
     /**
-     * GET /api/accounts/export - Export accounts
+     * GET /api/accounts/export - Export accounts for file download
      */
     app.get('/api/accounts/export', async (req, res) => {
         try {
@@ -471,6 +471,33 @@ export function mountWebUI(app, dirname, accountManager) {
             res.json(exportData);
         } catch (error) {
             logger.error('[WebUI] Export accounts error:', error);
+            res.status(500).json({ status: 'error', error: error.message });
+        }
+    });
+
+    /**
+     * GET /api/accounts/env-json - Export accounts formatted as ACCOUNTS_JSON string
+     */
+    app.get('/api/accounts/env-json', async (req, res) => {
+        try {
+            const { accounts } = await loadAccounts(ACCOUNT_CONFIG_PATH);
+            
+            // Format accounts for ACCOUNTS_JSON env var
+            const persistentAccounts = accounts
+                .filter(acc => acc.source !== 'database')
+                .map(acc => ({
+                    email: acc.email,
+                    source: acc.source,
+                    refreshToken: acc.refreshToken, // loadAccounts handles camel/snake merge
+                    apiKey: acc.apiKey,
+                    projectId: acc.projectId
+                }));
+            
+            res.json({ 
+                status: 'ok', 
+                json: JSON.stringify(persistentAccounts) 
+            });
+        } catch (error) {
             res.status(500).json({ status: 'error', error: error.message });
         }
     });

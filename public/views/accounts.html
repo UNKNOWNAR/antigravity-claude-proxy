@@ -40,6 +40,17 @@
                 <span x-text="$store.global.t('export') || 'Export'">Export</span>
             </button>
 
+            <!-- App Runner Sync Button -->
+            <button class="btn btn-xs btn-outline border-blue-500/30 text-blue-400 hover:bg-blue-500/10 transition-all gap-2 h-8"
+                @click="copyAppRunnerJson()"
+                x-show="$store.data.accounts.length > 0"
+                :title="$store.global.t('appRunnerSyncTitle') || 'Copy ACCOUNTS_JSON string for AWS App Runner Persistence'">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                </svg>
+                <span x-text="$store.global.t('appRunnerSync') || 'Sync App Runner'">Sync App Runner</span>
+            </button>
+
             <!-- Import Button -->
             <label class="btn btn-xs btn-outline border-space-border text-gray-400 hover:text-white transition-all gap-2 h-8 cursor-pointer"
                 :title="$store.global.t('importAccounts') || 'Import Accounts'">
