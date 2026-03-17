@@ -24,20 +24,28 @@ const modelCache = {
 };
 
 /**
- * Check if a model is supported (Claude or Gemini)
+ * Check if a model is "Work-Grade" supported (Claude 4.6+ or Gemini 3+)
+ * Filters out older versions (2.5), experimental agents, and raw internal IDs.
  * @param {string} modelId - Model ID to check
- * @param {boolean} [listingOnly=false] - Whether this check is for /v1/models listing
- * @returns {boolean} True if model is supported
+ * @returns {boolean} True if model is production-ready for coding work
  */
-function isSupportedModel(modelId, listingOnly = false) {
+function isSupportedModel(modelId) {
     const family = getModelFamily(modelId);
     if (family === 'unknown') return false;
 
-    // For /v1/models listing, filter out raw Google internal IDs (starting with models/)
-    // to keep the /model command list clean and professional in the CLI.
-    if (listingOnly && modelId.startsWith('models/')) return false;
+    const lower = modelId.toLowerCase();
 
-    return true;
+    // 1. Block messy internal Google IDs
+    if (lower.startsWith('models/')) return false;
+
+    // 2. Strictly allow only "Work-Grade" models:
+    // - Claude 4.6 series (Sonnet/Opus)
+    // - Gemini 3.0 or higher (Pro/Flash)
+    const isClaudeWorkGrade = lower.includes('claude') && lower.includes('4-6');
+    const isGeminiWorkGrade = lower.includes('gemini') && 
+                               (lower.includes('gemini-3') || lower.includes('gemini-4'));
+
+    return isClaudeWorkGrade || isGeminiWorkGrade;
 }
 
 /**
@@ -54,7 +62,7 @@ export async function listModels(token) {
     }
 
     const modelList = Object.entries(data.models)
-        .filter(([modelId]) => isSupportedModel(modelId, true)) // Pass flag to hide raw IDs
+        .filter(([modelId]) => isSupportedModel(modelId))
         .map(([modelId, modelData]) => ({
             id: modelId,
             object: 'model',
