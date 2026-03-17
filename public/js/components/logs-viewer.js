@@ -75,17 +75,32 @@ window.Components.logsViewer = () => ({
         this.eventSource = new EventSource(url);
         this.eventSource.onmessage = (event) => {
             try {
+                if (event.data === ': heartbeat') return;
+                
                 const log = JSON.parse(event.data);
+                
+                // Extra safety: truncate message if it somehow escaped server-side truncation
+                if (log.message && log.message.length > 5000) {
+                    log.message = log.message.substring(0, 5000) + '... (web-truncated)';
+                }
+                
                 this.logs.push(log);
 
-                // Limit log buffer
-                const limit = Alpine.store('settings')?.logLimit || window.AppConstants.LIMITS.DEFAULT_LOG_LIMIT;
+                // STRONGER LIMIT: 500 lines is plenty for a browser tab and prevents 21GB RAM leaks
+                const limit = 500;
                 if (this.logs.length > limit) {
-                    this.logs = this.logs.slice(-limit);
+                    // Use splice for better memory behavior than slice(-limit) which clones
+                    this.logs.splice(0, this.logs.length - limit);
                 }
 
                 if (this.isAutoScroll) {
-                    this.$nextTick(() => this.scrollToBottom());
+                    // Debounce scroll to prevent UI jank during log bursts
+                    if (!this._scrollTimeout) {
+                        this._scrollTimeout = setTimeout(() => {
+                            this.scrollToBottom();
+                            this._scrollTimeout = null;
+                        }, 50);
+                    }
                 }
             } catch (e) {
                 if (window.UILogger) window.UILogger.debug('Log parse error:', e.message);

@@ -50,6 +50,26 @@ window.Components.dashboard = () => ({
                     this.updateTrendChart();
                     this.checkClaudeConfigStatus();
                 });
+            } else if (val !== 'dashboard') {
+                // ACTIVE PURGE: Destroy charts when tab is hidden to free up GPU and RAM
+                if (window.UILogger) window.UILogger.debug('[Dashboard] Tab deactivated, purging chart memory');
+                
+                if (this.charts.overallHealth) {
+                    try { this.charts.overallHealth.stop(); this.charts.overallHealth.destroy(); } catch(e) {}
+                    this.charts.overallHealth = null;
+                }
+                
+                if (this.charts.usageTrend) {
+                    try { this.charts.usageTrend.stop(); this.charts.usageTrend.destroy(); } catch(e) {}
+                    this.charts.usageTrend = null;
+                }
+                
+                // Also purge from canvas element to be 100% sure
+                const trendCanvas = document.getElementById("usageTrendChart");
+                if (trendCanvas && trendCanvas._chartInstance) {
+                    trendCanvas._chartInstance.destroy();
+                    trendCanvas._chartInstance = null;
+                }
             }
         });
 

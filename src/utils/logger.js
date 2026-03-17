@@ -67,7 +67,13 @@ class Logger extends EventEmitter {
         const levelTag = `${color}[${level}]${COLORS.RESET}`;
 
         // Format the message with args similar to console.log
-        const formattedMessage = util.format(message, ...args);
+        let formattedMessage = util.format(message, ...args);
+
+        // SAFETY: Truncate extremely long messages to prevent memory exhaustion (e.g. logging massive request bodies)
+        const MAX_LOG_MESSAGE_LENGTH = 10000;
+        if (formattedMessage.length > MAX_LOG_MESSAGE_LENGTH) {
+            formattedMessage = formattedMessage.substring(0, MAX_LOG_MESSAGE_LENGTH) + '... (truncated)';
+        }
 
         console.log(`${timestamp} ${levelTag} ${formattedMessage}`);
 

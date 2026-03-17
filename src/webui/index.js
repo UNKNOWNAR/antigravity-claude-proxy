@@ -1081,18 +1081,54 @@ export function mountWebUI(app, dirname, accountManager) {
      * GET /api/logs/stream - Stream logs via SSE
      */
     app.get('/api/logs/stream', (req, res) => {
+        // Limit active log streams per server (concurrency guard)
+        const MAX_STREAMS = 5;
+        const currentStreams = logger.listenerCount('log');
+        if (currentStreams >= MAX_STREAMS) {
+            return res.status(503).json({ status: 'error', error: 'Too many active log streams' });
+        }
+
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');
         res.setHeader('Connection', 'keep-alive');
+        res.setHeader('X-Accel-Buffering', 'no'); // Disable proxy buffering (Nginx, App Runner?)
+
+        let isClosed = false;
 
         const sendLog = (log) => {
-            res.write(`data: ${JSON.stringify(log)}\n\n`);
+            if (isClosed) return;
+            try {
+                // Node.js res.writable property check
+                if (res.writableEnded || res.finished) {
+                    isClosed = true;
+                    cleanup();
+                    return;
+                }
+                res.write(`data: ${JSON.stringify(log)}\n\n`);
+            } catch (err) {
+                isClosed = true;
+                cleanup();
+            }
+        };
+
+        const cleanup = () => {
+             if (isClosed) return;
+             isClosed = true;
+             if (logger.off) { 
+                 logger.off('log', sendLog); 
+             } else if (logger.removeListener) {
+                 logger.removeListener('log', sendLog);
+             }
+             try { res.end(); } catch (e) {}
         };
 
         // Send recent history if requested
         if (req.query.history === 'true' && logger.getHistory) {
             const history = logger.getHistory();
-            history.forEach(log => sendLog(log));
+            // Optional: Limit history for SSE to prevent massive initial burst
+            const limit = req.query.limit ? parseInt(req.query.limit) : 100;
+            const historyToSend = history.slice(-limit);
+            historyToSend.forEach(log => sendLog(log));
         }
 
         // Subscribe to new logs
@@ -1100,12 +1136,19 @@ export function mountWebUI(app, dirname, accountManager) {
             logger.on('log', sendLog);
         }
 
+        // Keep-alive heartbeat (every 15s)
+        const keepAlive = setInterval(() => {
+            if (!isClosed) res.write(': heartbeat\n\n');
+        }, 15000);
+
         // Cleanup on disconnect
         req.on('close', () => {
-            if (logger.off) {
-                logger.off('log', sendLog);
-            }
+            clearInterval(keepAlive);
+            cleanup();
         });
+
+        // Error handling
+        req.on('error', cleanup);
     });
 
     // ==========================================

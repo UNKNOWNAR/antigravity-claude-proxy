@@ -115,10 +115,41 @@ document.addEventListener('alpine:init', () => {
         },
 
         startAutoRefresh() {
-            if (this.refreshTimer) clearInterval(this.refreshTimer);
-            const interval = parseInt(Alpine.store('settings')?.refreshInterval || 60);
-            if (interval > 0) {
-                this.refreshTimer = setInterval(() => Alpine.store('data').fetchData(), interval * 1000);
+            if (this.refreshTimer) {
+                clearInterval(this.refreshTimer);
+                clearTimeout(this.refreshTimer);
+            }
+            
+            const schedule = () => {
+                const interval = parseInt(Alpine.store('settings')?.refreshInterval || 60);
+                if (interval <= 0) return;
+                
+                // If document is hidden, reduce frequency (multiply interval by 5, e.g. 60s -> 5m)
+                // to save memory and server resources when the tab is inactive
+                const effectiveInterval = document.hidden ? (interval * 5) : interval;
+                
+                // Clear any existing wait
+                if (this.refreshTimer) clearTimeout(this.refreshTimer);
+                
+                this.refreshTimer = setTimeout(() => {
+                    // Only fetch if tab is active OR if it's the slower background fetch
+                    Alpine.store('data').fetchData();
+                    schedule();
+                }, effectiveInterval * 1000);
+            };
+            
+            schedule();
+
+            // Setup visibility listener once to trigger immediate refresh/re-schedule
+            if (!window._visibilityListenerAdded) {
+                window._visibilityListenerAdded = true;
+                document.addEventListener('visibilitychange', () => {
+                    if (!document.hidden) {
+                        // Immediately refresh when coming back to tab
+                        Alpine.store('data').fetchData();
+                    }
+                    this.startAutoRefresh();
+                });
             }
         },
 

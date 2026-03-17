@@ -14,7 +14,7 @@
     "public"
   ],
   "scripts": {
-    "build": "npm run build:css && npm prune --production",
+    "build": "npm run build:css && npm prune --production && npm cache clean --force",
     "build:css": "tailwindcss -i ./public/css/src/input.css -o ./public/css/style.css --minify",
     "watch:css": "tailwindcss -i ./public/css/src/input.css -o ./public/css/style.css --watch",
     "start": "node src/index.js",

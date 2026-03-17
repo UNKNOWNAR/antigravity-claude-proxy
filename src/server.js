@@ -365,6 +365,17 @@ app.get('/account-limits', async (req, res) => {
                 }
 
                 try {
+                    // Cache quota for 5 minutes during background refreshes
+                    const QUOTA_CACHE_TTL = 5 * 60 * 1000;
+                    if (account.quota?.models && (Date.now() - (account.quota.lastChecked || 0)) < QUOTA_CACHE_TTL) {
+                        return {
+                            email: account.email,
+                            status: 'ok',
+                            subscription: account.subscription || { tier: 'unknown', projectId: null },
+                            models: account.quota.models
+                        };
+                    }
+
                     const token = await accountManager.getTokenForAccount(account);
 
                     // Fetch subscription tier first to get project ID
@@ -385,9 +396,15 @@ app.get('/account-limits', async (req, res) => {
                     };
 
                     // Save updated account data to disk (async, don't wait)
-                    accountManager.saveToDisk().catch(err => {
-                        logger.error('[Server] Failed to save account data:', err);
-                    });
+                    // Only save if significant metadata changed (tier/projectId)
+                    // Or if no cache existed yet
+                    if (subscription.tier !== account._lastSavedTier || subscription.projectId !== account._lastSavedProjectId) {
+                        account._lastSavedTier = subscription.tier;
+                        account._lastSavedProjectId = subscription.projectId;
+                        accountManager.saveToDisk().catch(err => {
+                            logger.error('[Server] Failed to save account data:', err);
+                        });
+                    }
 
                     return {
                         email: account.email,
