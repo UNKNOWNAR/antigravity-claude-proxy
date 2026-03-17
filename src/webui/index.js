@@ -476,33 +476,6 @@ export function mountWebUI(app, dirname, accountManager) {
     });
 
     /**
-     * GET /api/accounts/env-json - Export accounts formatted as ACCOUNTS_JSON string
-     */
-    app.get('/api/accounts/env-json', async (req, res) => {
-        try {
-            const { accounts } = await loadAccounts(ACCOUNT_CONFIG_PATH);
-            
-            // Format accounts for ACCOUNTS_JSON env var
-            const persistentAccounts = accounts
-                .filter(acc => acc.source !== 'database')
-                .map(acc => ({
-                    email: acc.email,
-                    source: acc.source,
-                    refreshToken: acc.refreshToken, // loadAccounts handles camel/snake merge
-                    apiKey: acc.apiKey,
-                    projectId: acc.projectId
-                }));
-            
-            res.json({ 
-                status: 'ok', 
-                json: JSON.stringify(persistentAccounts) 
-            });
-        } catch (error) {
-            res.status(500).json({ status: 'error', error: error.message });
-        }
-    });
-
-    /**
      * POST /api/accounts/import - Batch import accounts
      */
     app.post('/api/accounts/import', async (req, res) => {

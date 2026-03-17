@@ -352,9 +352,6 @@ window.translations.en = {
     importAccounts: "Import Accounts",
     exportSuccess: "Exported {count} accounts",
     exportFailed: "Export failed",
-    appRunnerSync: "Sync App Runner",
-    appRunnerSyncTitle: "Copy ACCOUNTS_JSON string for AWS App Runner Persistence",
-    syncStringCopied: "Current configuration copied! Paste this into your ACCOUNTS_JSON environment variable in AWS App Runner console.",
     importSuccess: "Import complete:",
     importFailed: "Import failed",
     // UI Elements

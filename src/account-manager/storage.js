@@ -22,93 +22,58 @@ let writeLock = null;
  * @returns {Promise<{accounts: Array, settings: Object, activeIndex: number}>}
  */
 export async function loadAccounts(configPath = ACCOUNT_CONFIG_PATH) {
-    let envConfig = null;
-    let diskConfig = null;
-
-    // 1. Load from environment variable (Seeding mode)
-    if (process.env.ACCOUNTS_JSON) {
-        try {
-            const parsed = JSON.parse(process.env.ACCOUNTS_JSON);
-            envConfig = Array.isArray(parsed) ? { accounts: parsed } : parsed;
-            logger.info(`[AccountManager] Found ${envConfig.accounts?.length || 0} accounts in ACCOUNTS_JSON environment variable`);
-        } catch (e) {
-            logger.error('[AccountManager] Failed to parse ACCOUNTS_JSON env var:', e.message);
-        }
-    }
-
-    // 2. Load from disk (Persistence mode)
     try {
-        await access(configPath, fsConstants.F_OK);
-        const configData = await readFile(configPath, 'utf-8');
-        diskConfig = JSON.parse(configData);
-        logger.info(`[AccountManager] Loaded ${diskConfig.accounts?.length || 0} accounts from disk: ${configPath}`);
-    } catch (error) {
-        if (error.code !== 'ENOENT') {
-            logger.error('[AccountManager] Failed to load disk config:', error.message);
-        }
-    }
-
-    // 3. Merge Strategy:
-    // - If both exist: Merge by email. Disk version takes precedence for tokens/ids.
-    // - If only env exists: Use env.
-    // - If only disk exists: Use disk.
-    // - If none: Return empty.
-    let mergedConfig = { accounts: [], settings: {}, activeIndex: 0 };
-
-    if (envConfig || diskConfig) {
-        const accountsMap = new Map();
-        
-        // Load env accounts first
-        if (envConfig?.accounts) {
-            envConfig.accounts.forEach(acc => {
-                if (acc && acc.email) accountsMap.set(acc.email, { ...acc, _source: 'env' });
-            });
+        let config;
+        // Check the environment variable first!
+        if (process.env.ACCOUNTS_JSON) {
+            logger.info("Loading accounts from environment variable...");
+            config = JSON.parse(process.env.ACCOUNTS_JSON);
+            if (Array.isArray(config)) {
+                config = { accounts: config };
+            }
+        } else {
+            // Check if config file exists using async access
+            await access(configPath, fsConstants.F_OK);
+            const configData = await readFile(configPath, 'utf-8');
+            config = JSON.parse(configData);
         }
 
-        // Override with disk accounts (they contain fresher refresh tokens)
-        if (diskConfig?.accounts) {
-            diskConfig.accounts.forEach(acc => {
-                if (acc && acc.email) {
-                    accountsMap.set(acc.email, { 
-                        ...(accountsMap.get(acc.email) || {}), 
-                        ...acc,
-                        _source: 'disk' 
-                    });
-                }
-            });
-        }
-
-        mergedConfig = {
-            settings: diskConfig?.settings || envConfig?.settings || {},
-            activeIndex: diskConfig?.activeIndex || envConfig?.activeIndex || 0,
-            accounts: Array.from(accountsMap.values())
-        };
-    }
-
-    try {
-        const accounts = (mergedConfig.accounts || []).map(acc => ({
+        const accounts = (config.accounts || []).map(acc => ({
             ...acc,
             lastUsed: acc.lastUsed || null,
-            enabled: acc.enabled !== false,
-            // Reset invalid flag on startup unless it needs user intervention
+            enabled: acc.enabled !== false, // Default to true if not specified
+            // Reset invalid flag on startup - give accounts a fresh chance
+            // EXCEPT accounts with a verifyUrl — those need user intervention
             isInvalid: acc.verifyUrl ? (acc.isInvalid || false) : false,
             invalidReason: acc.verifyUrl ? (acc.invalidReason || null) : null,
             verifyUrl: acc.verifyUrl || null,
             modelRateLimits: acc.modelRateLimits || {},
+            // New fields for subscription and quota tracking
             subscription: acc.subscription || { tier: 'unknown', projectId: null, detectedAt: null },
             quota: acc.quota || { models: {}, lastChecked: null },
-            quotaThreshold: acc.quotaThreshold,
+            // Quota threshold settings (per-account and per-model overrides)
+            quotaThreshold: acc.quotaThreshold,  // undefined means use global
             modelQuotaThresholds: acc.modelQuotaThresholds || {}
         }));
 
-        const settings = mergedConfig.settings || {};
-        let activeIndex = mergedConfig.activeIndex || 0;
+        const settings = config.settings || {};
+        let activeIndex = config.activeIndex || 0;
 
-        if (activeIndex >= accounts.length) activeIndex = 0;
+        // Clamp activeIndex to valid range
+        if (activeIndex >= accounts.length) {
+            activeIndex = 0;
+        }
+
+        logger.info(`[AccountManager] Loaded ${accounts.length} account(s) from config`);
 
         return { accounts, settings, activeIndex };
     } catch (error) {
-        logger.error('[AccountManager] Error processing merged accounts:', error.message);
+        if (error.code === 'ENOENT') {
+            // No config file - return empty
+            logger.info('[AccountManager] No config file found. Using Antigravity database (single account mode)');
+        } else {
+            logger.error('[AccountManager] Failed to load config:', error.message);
+        }
         return { accounts: [], settings: {}, activeIndex: 0 };
     }
 }
