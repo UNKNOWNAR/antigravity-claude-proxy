@@ -340,6 +340,46 @@ app.get('/health', async (req, res) => {
 });
 
 /**
+ * System stats endpoint for diagnostics (RAM / CPU / Disk)
+ */
+app.get('/api/system/stats', async (req, res) => {
+    try {
+        const mem = process.memoryUsage();
+        const stats = {
+            status: 'ok',
+            timestamp: new Date().toISOString(),
+            process: {
+                uptime: process.uptime(),
+                memory: {
+                    rss: Math.round(mem.rss / 1024 / 1024) + 'MB',
+                    heapTotal: Math.round(mem.heapTotal / 1024 / 1024) + 'MB',
+                    heapUsed: Math.round(mem.heapUsed / 1024 / 1024) + 'MB',
+                    external: Math.round(mem.external / 1024 / 1024) + 'MB',
+                },
+                nodeVersion: process.version,
+                platform: process.platform
+            }
+        };
+
+        // Attempt to get basic disk info
+        try {
+            const fs = await import('fs/promises');
+            const dataDir = process.cwd();
+            const logFiles = await fs.readdir(dataDir).catch(() => []);
+            stats.files = {
+                currentDir: dataDir,
+                hasAccountsJson: logFiles.includes('accounts.json'),
+                hasConfigJson: logFiles.includes('config.json')
+            };
+        } catch (diskErr) {}
+
+        res.json(stats);
+    } catch (error) {
+        res.status(500).json({ status: 'error', error: error.message });
+    }
+});
+
+/**
  * Account limits endpoint - fetch quota/limits for all accounts × all models
  * Returns a table showing remaining quota and reset time for each combination
  * Use ?format=table for ASCII table output, default is JSON
