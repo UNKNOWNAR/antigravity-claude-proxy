@@ -8,6 +8,9 @@ import { spawn, exec } from 'child_process';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// Import Claude config utilities
+import { readClaudeConfig, updateClaudeConfig, getClaudeConfigPath } from '../src/utils/claude-config.js';
+
 // Read package.json for version
 const packageJson = JSON.parse(
   readFileSync(join(__dirname, '..', 'package.json'), 'utf-8')
@@ -280,7 +283,7 @@ async function restartServer() {
 /**
  * Show server status
  */
-function showStatus() {
+async function showStatus() {
   console.log('');
   console.log('╭' + '─'.repeat(48) + '╮');
   console.log('│  🛸 Antigravity Claude Proxy                   │');
@@ -310,6 +313,22 @@ function showStatus() {
     console.log('  TO LAUNCH');
     console.log('  • acc start      Bring proxy online');
   }
+  
+  // Show Claude CLI connection status
+  try {
+    const claudeSettings = await readClaudeConfig();
+    const isConnected = claudeSettings.env?.ANTHROPIC_BASE_URL?.includes('localhost');
+    console.log('');
+    console.log('  CLAUDE CLI');
+    if (isConnected) {
+        console.log(`  ⚡ Connected to local proxy (${claudeSettings.env.ANTHROPIC_BASE_URL})`);
+    } else {
+        console.log('  🌑 Using official Anthropic API (Standard Mode)');
+    }
+  } catch (e) {
+    // Ignore config read errors for status
+  }
+  
   console.log('');
 }
 
@@ -379,6 +398,8 @@ USAGE
   status             View proxy health and details
   ui                 Open dashboard in browser
   models             List available Work-Grade models
+  on                 Set Claude CLI to use local proxy
+  off                Restore Claude CLI to official API
 
 ━━━ ACCOUNT MANAGEMENT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   accounts           Interactive account menu
@@ -473,6 +494,50 @@ async function main() {
         console.log('');
       } catch (e) {
         console.log('🌑 Could not reach proxy. Start it first with: acc start');
+      }
+      break;
+    }
+
+    case 'on': {
+      const port = getPort();
+      console.log('');
+      console.log(`🔌 Connecting Claude CLI to local proxy (localhost:${port})...`);
+      try {
+        await updateClaudeConfig({
+          env: {
+            ANTHROPIC_BASE_URL: `http://localhost:${port}`,
+            ANTHROPIC_API_KEY: 'antigravity-proxy'
+          }
+        });
+        console.log('✅ Claude CLI is now using Antigravity Proxy.');
+        console.log('   Restart your Claude session to apply.');
+        console.log('');
+      } catch (e) {
+        console.error('❌ Failed to update Claude config:', e.message);
+        console.log('');
+      }
+      break;
+    }
+
+    case 'off': {
+      console.log('');
+      console.log('🔌 Restoring Claude CLI to official Anthropic API...');
+      try {
+        // We want to remove the specific keys, so we read and write back
+        const config = await readClaudeConfig();
+        if (config.env) {
+          delete config.env.ANTHROPIC_BASE_URL;
+          delete config.env.ANTHROPIC_API_KEY;
+        }
+        // Write the whole thing back (replacing ensures keys are truly gone)
+        const { replaceClaudeConfig } = await import('../src/utils/claude-config.js');
+        await replaceClaudeConfig(config);
+        
+        console.log('✅ Claude CLI restored to default settings.');
+        console.log('');
+      } catch (e) {
+        console.error('❌ Failed to restore Claude config:', e.message);
+        console.log('');
       }
       break;
     }
